@@ -1,7 +1,6 @@
 #0 Setup------------------------------------------------------------------------
-# Install packages and load libraries
-# install.packages("ggplot2")
 library(ggplot2)
+library(scales)
 
 # Import data obtained from ELISA practical
 elisa_data <- read.csv("Data frame.csv", row.names = 1)
@@ -44,10 +43,6 @@ row.names(standard_data)[row.names(standard_data) == "9"] <- "log_conc"
 # Switching rows and columns (to allow for plotting)
 curve_data <- standard_data[5:9, ]
 curve_data_t <- data.frame(t(curve_data))
-
-# Ignore:(Archived code: to plot linear curve for restricted section)
-#curve_data_t$log_conc_restrict = ifelse(curve_data_t$log_conc < 1, 
-#                                        curve_data_t$log_conc, NA)
 
 # Plotting a linear "standard curve"
 standard_curve <- 
@@ -93,8 +88,11 @@ modelled_curve <- ggplot(df, aes(concentrations, measurements)) +
   geom_point() + 
   geom_errorbar(aes(ymin = measurements - sd, ymax = measurements + sd, 
                     width = 0.1)) + 
-  scale_x_log10() + scale_y_continuous(breaks = seq(0, 2, by = 0.25)) + 
-  xlab("Log(IgG Concentration (μgml-1))") + ylab("Absorbance Units (405nm)") + 
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(breaks = seq(0, 2, by = 0.25)) + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) + 
+  xlab("Log(IgG Concentration (μg mL-1))") + ylab("Absorbance Units (405nm)") + 
   stat_function(data = df, fun  = model4pl,
                 args = list(Mid = coef(fit)["Mid"],
                             Background = coef(fit)["Background"],
@@ -103,8 +101,8 @@ modelled_curve <- ggplot(df, aes(concentrations, measurements)) +
                 colour = "cornflowerblue") + 
   theme_bw()
 
-#ggsave("Standard Curves/Modelled Standard Curve.png", plot = modelled_curve, 
-#width = 10, height = 8)
+ggsave("Standard Curves/Modelled Standard Curve.png", plot = modelled_curve, 
+width = 8.75, height = 7)
 
 #5 Calculating concentrations---------------------------------------------------
 #(a mathematical method of "reading off the graph"
@@ -116,16 +114,11 @@ CalcConc( coef(fit)["Background"],
           coef(fit)["Mid"],
           coef(fit)["Slope"],
           coef(fit)["Bmax"],
-          y = 1.40 )
+          y = 1.15 )
 
 # Putting these output into a dataframe
 patient_calcultaions <- data.frame("Patient 1" = c(0.32, 0.1684709), 
                                    "Patient 2" = c(0.21, 0.027622), 
                                    "Patient 3" = c(1.40, 188.4006))
 
-row.names(patient_calcultaions) <- c("Abs", "Log_Conc")
-
-# Calculating anti-log to find concentration in μgmL-1
-antilog <- function(x){10^x}
-patient_calcultaions["Conc", ] <- apply(patient_calcultaions["Log_Conc", ], 2, 
-                                        antilog)
+row.names(patient_calcultaions) <- c("Abs", "Conc")
